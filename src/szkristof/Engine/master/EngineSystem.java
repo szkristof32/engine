@@ -28,13 +28,5 @@ public interface EngineSystem {
 	 * extends this.
 	 */
 	public abstract void cleanUp();
-	
-	public default void preUpdate() {
-		
-	}
-	
-	public default void postUpdate() {
-		
-	}
 
 }

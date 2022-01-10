@@ -58,13 +58,13 @@ public class Logger implements EngineSystem {
 	}
 
 	/**
-	 * The method prints a plain white message in the format that specified at the docs of the class
+	 * The method prints a green message in the format that specified at the docs of the class
 	 * 
 	 * @param message
 	 */
 	public void info(String message) {
 		builder.delete(0, builder.capacity());
-		setColour(ANSI_WHITE);
+		setColour(ANSI_GREEN);
 		log(message);
 		System.out.println(builder);
 	}
@@ -89,6 +89,18 @@ public class Logger implements EngineSystem {
 	public void error(String message) {
 		builder.delete(0, builder.capacity());
 		setColour(ANSI_RED);
+		log(message);
+		System.out.println(builder);
+	}
+	
+	/**
+	 * The method prints a plain white message in the format that specified at the docs of the class
+	 * 
+	 * @param message
+	 */
+	public void trace(String message) {
+		builder.delete(0, builder.capacity());
+		setColour(ANSI_WHITE);
 		log(message);
 		System.out.println(builder);
 	}

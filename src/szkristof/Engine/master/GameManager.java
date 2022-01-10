@@ -8,7 +8,6 @@ import org.lwjgl.glfw.GLFW;
 import szkristof.Engine.master.systems.Logger;
 import szkristof.Engine.master.systems.Window;
 import szkristof.Engine.master.systems.WindowSettings;
-import szkristof.Engine.master.systems.events.Event;
 import szkristof.Engine.utils.OpenglUtils;
 
 /**
@@ -35,9 +34,8 @@ public abstract class GameManager {
 
 	public GameManager() {
 		instance = this;
-		systems.put("Logger", new Logger("Engine"));
+		systems.put("CoreLogger", new Logger("Engine"));
 		addSystem("Window", new Window(new WindowSettings()));
-		addSystem("Event", new Event());
 	}
 
 	/**
@@ -83,18 +81,12 @@ public abstract class GameManager {
 	 * including the renderers.
 	 */
 	public void update() {
-		OpenglUtils.initialiseBuffers(0.2f, 0.2f, 0.2f, 1);
+		OpenglUtils.initialiseBuffers(1f, 0f, 1f, 1f);
 		double time = GLFW.glfwGetTime();
 		delta = (float) (time - prevTime);
 		prevTime = time;
 		systems.forEach((String name, EngineSystem system) -> {
-			system.preUpdate();
-		});
-		systems.forEach((String name, EngineSystem system) -> {
 			system.update();
-		});
-		systems.forEach((String name, EngineSystem system) -> {
-			system.postUpdate();
 		});
 	}
 
@@ -118,7 +110,7 @@ public abstract class GameManager {
 	}
 
 	public Logger getLogger() {
-		return (Logger) systems.get("Logger");
+		return (Logger) systems.get("CoreLogger");
 	}
 
 	public static Logger getStaticLogger() {

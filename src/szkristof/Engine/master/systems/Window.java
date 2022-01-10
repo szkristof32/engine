@@ -9,16 +9,26 @@ import org.lwjgl.system.MemoryUtil;
 
 import szkristof.Engine.master.EngineSystem;
 import szkristof.Engine.master.GameManager;
-import szkristof.Engine.master.systems.events.window.WindowResizeEvent;
+import szkristof.Engine.master.systems.events.Event;
+import szkristof.Engine.master.systems.events.EventDispatcher;
+import szkristof.Engine.master.systems.events.application.WindowCloseEvent;
+import szkristof.Engine.master.systems.events.application.WindowMoveEvent;
+import szkristof.Engine.master.systems.events.application.WindowResizeEvent;
+import szkristof.Engine.master.systems.events.keyboard.KeyPressedEvent;
+import szkristof.Engine.master.systems.events.keyboard.KeyReleasedEvent;
+import szkristof.Engine.master.systems.events.mouse.MouseButtonPressedEvent;
+import szkristof.Engine.master.systems.events.mouse.MouseButtonReleasedEvent;
+import szkristof.Engine.master.systems.events.mouse.MouseMovedEvent;
+import szkristof.Engine.master.systems.events.mouse.MouseScrolledEvent;
 
 /**
- * This class represents a window. The window is set up via GLFW (Graphics Library Framework). Any
- * updates with the window are happening here.
+ * This class represents a window. The window is set up via GLFW (Graphics
+ * Library Framework). Any updates with the window are happening here.
  * 
  * @author szkristof
  *
  */
-public class Window implements EngineSystem, WindowResizeEvent {
+public class Window implements EngineSystem {
 
 	private long id;
 
@@ -31,10 +41,12 @@ public class Window implements EngineSystem, WindowResizeEvent {
 	private WindowSettings settings;
 	private boolean fullscreen;
 
+	private boolean running = true;
+
 	/**
 	 * 
-	 * @param settings WindowSettings is a class that holds the basic informations of a window like
-	 *                 width, height, title etc.
+	 * @param settings WindowSettings is a class that holds the basic informations
+	 *                 of a window like width, height, title etc.
 	 */
 	public Window(WindowSettings settings) {
 		this.width = settings.width;
@@ -46,7 +58,8 @@ public class Window implements EngineSystem, WindowResizeEvent {
 
 	@Override
 	public void init() {
-		if (!GLFW.glfwInit()) {
+		boolean glfwInitialised = GLFW.glfwInit();
+		if (!glfwInitialised) {
 			GameManager.getStaticLogger().error("GLFW failed to initialised.");
 			System.exit(-1);
 		}
@@ -57,9 +70,9 @@ public class Window implements EngineSystem, WindowResizeEvent {
 		GLFW.glfwMakeContextCurrent(id);
 		GL.createCapabilities();
 		GL11.glViewport(0, 0, width, height);
-		initEvent();
+		createEventCallbacks();
 	}
-	
+
 	private void createWindow(GLFWVidMode vidMode) {
 		if (settings.fullscreen) {
 			id = GLFW.glfwCreateWindow(vidMode.width(), vidMode.height(), title, GLFW.glfwGetPrimaryMonitor(),
@@ -68,7 +81,7 @@ public class Window implements EngineSystem, WindowResizeEvent {
 			id = GLFW.glfwCreateWindow(width, height, title, MemoryUtil.NULL, MemoryUtil.NULL);
 			GLFW.glfwSetWindowPos(id, (vidMode.width() - width) / 2, (vidMode.height() - height) / 2);
 		}
-		if(id == MemoryUtil.NULL) {
+		if (id == MemoryUtil.NULL) {
 			GameManager.getStaticLogger().error("Unable to create window.");
 			System.exit(-1);
 		}
@@ -102,7 +115,6 @@ public class Window implements EngineSystem, WindowResizeEvent {
 
 	@Override
 	public void cleanUp() {
-		GameManager.getStaticLogger().info("Window is closing...");
 		Callbacks.glfwFreeCallbacks(id);
 		GLFW.glfwDestroyWindow(id);
 		GLFW.glfwTerminate();
@@ -113,7 +125,7 @@ public class Window implements EngineSystem, WindowResizeEvent {
 	 * @return a boolean that indicates that the user wants to close the window
 	 */
 	public boolean windowShouldClose() {
-		return GLFW.glfwWindowShouldClose(id);
+		return !running;
 	}
 
 	/**
@@ -146,8 +158,8 @@ public class Window implements EngineSystem, WindowResizeEvent {
 
 	/**
 	 * 
-	 * @param fullscreen When true the window goes to fullscreen, otherwise it returns being a normal
-	 *                   bordered window.
+	 * @param fullscreen When true the window goes to fullscreen, otherwise it
+	 *                   returns being a normal bordered window.
 	 */
 	public void goFullScreen(boolean fullscreen) {
 		long monitor = GLFW.glfwGetPrimaryMonitor();
@@ -172,11 +184,89 @@ public class Window implements EngineSystem, WindowResizeEvent {
 		GLFW.glfwSetWindowPos(id, (vidMode.width() - desiredWidth) / 2, (vidMode.height() - desiredHeight) / 2);
 	}
 
-	@Override
-	public void invoke(long window, int width, int height) {
-		this.width = width;
-		this.height = height;
-		GL11.glViewport(0, 0, width, height);
+	private void createEventCallbacks() {
+		GLFW.glfwSetErrorCallback((id, description) -> {
+			GameManager.getStaticLogger().error("GLFW error (" + id + "): " + description);
+		});
+		GLFW.glfwSetWindowSizeCallback(id, (windowId, width, height) -> {
+			WindowResizeEvent event = new WindowResizeEvent(width, height);
+			onEvent(event);
+		});
+		GLFW.glfwSetWindowCloseCallback(id, (windowId) -> {
+			WindowCloseEvent event = new WindowCloseEvent();
+			onEvent(event);
+		});
+		GLFW.glfwSetWindowPosCallback(id, (windowId, x, y) -> {
+			WindowMoveEvent event = new WindowMoveEvent(x, y);
+			onEvent(event);
+		});
+		GLFW.glfwSetKeyCallback(id, (windowId, key, scancode, action, mods) -> {
+			switch (action) {
+				case GLFW.GLFW_PRESS: {
+					KeyPressedEvent event = new KeyPressedEvent(key, 0);
+					onEvent(event);
+					break;
+				}
+				case GLFW.GLFW_REPEAT: {
+					KeyPressedEvent event = new KeyPressedEvent(key, 1);
+					onEvent(event);
+					break;
+				}
+				case GLFW.GLFW_RELEASE: {
+					KeyReleasedEvent event = new KeyReleasedEvent(key);
+					onEvent(event);
+					break;
+				}
+			}
+		});
+		GLFW.glfwSetMouseButtonCallback(id, (windowId, button, action, mods) -> {
+			switch (action) {
+				case GLFW.GLFW_PRESS: {
+					MouseButtonPressedEvent event = new MouseButtonPressedEvent(button);
+					onEvent(event);
+					break;
+				}
+				case GLFW.GLFW_RELEASE: {
+					MouseButtonReleasedEvent event = new MouseButtonReleasedEvent(button);
+					onEvent(event);
+					break;
+				}
+			}
+		});
+		GLFW.glfwSetScrollCallback(id, (windowId, xOffset, yOffset) -> {
+			MouseScrolledEvent event = new MouseScrolledEvent((float) xOffset, (float) yOffset);
+			onEvent(event);
+		});
+		GLFW.glfwSetCursorPosCallback(id, (windowId, xPos, yPos) -> {
+			MouseMovedEvent event = new MouseMovedEvent((float) xPos, (float) yPos);
+			onEvent(event);
+		});
+	}
+
+	private void onEvent(Event event) {
+		try {
+			EventDispatcher dispatcher = new EventDispatcher(event);
+			dispatcher.dispatch(WindowResizeEvent.class, () -> {
+				onWindowResize((WindowResizeEvent) event);
+				return true;
+			});
+			dispatcher.dispatch(WindowCloseEvent.class, () -> {
+				onWindowClose();
+				return true;
+			});
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	private void onWindowResize(WindowResizeEvent event) {
+		this.width = event.getWidth();
+		this.height = event.getHeight();
+	}
+
+	private void onWindowClose() {
+		this.running = false;
+		GameManager.getStaticLogger().info("Window is closing...");
 	}
 
 }
